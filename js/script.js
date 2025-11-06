@@ -1,22 +1,24 @@
 // ===== NASA Space Explorer =====
-// Project feed: mirror of APOD-like objects (date/title/explanation/media_type/url/...)
-// See brief/README for why we use the provided JSON instead of live API.  :contentReference[oaicite:2]{index=2} :contentReference[oaicite:3]{index=3}
 
-const CDN_URL = 'https://cdn.jsdelivr.net/gh/GCA-Classroom/apod/data.json'; // provided JSON feed
+// Class-provided APOD-like JSON feed (same fields as APOD; no key)
+const CDN_URL = 'https://cdn.jsdelivr.net/gh/GCA-Classroom/apod/data.json';
 
-// Elements
+let DATA = [];
+let BY_DATE = new Map();
+
+// ---- DOM ----
 const startDateEl = document.getElementById('startDate');
-const fetchBtn = document.getElementById('fetchBtn');
-const loadingEl = document.getElementById('loading');
-const galleryEl = document.getElementById('gallery');
-const factBox = document.getElementById('factBox');
+const fetchBtn    = document.getElementById('fetchBtn');
+const loadingEl   = document.getElementById('loading');
+const galleryEl   = document.getElementById('gallery');
+const factBox     = document.getElementById('factBox');
 
-// Modal elements
-const modal = document.getElementById('apodModal');
-const modalClose = document.getElementById('modalClose');
-const modalMedia = document.getElementById('modalMedia');
-const modalTitle = document.getElementById('modalTitle');
-const modalDate = document.getElementById('modalDate');
+// Modal
+const modal        = document.getElementById('apodModal');
+const modalClose   = document.getElementById('modalClose');
+const modalMedia   = document.getElementById('modalMedia');
+const modalTitle   = document.getElementById('modalTitle');
+const modalDate    = document.getElementById('modalDate');
 const modalExplain = document.getElementById('modalExplain');
 
 // ---- LevelUp: Random Space Fact ----
@@ -27,53 +29,88 @@ const FACTS = [
   "A day on Mercury has two sunrises.",
   "There are more trees on Earth than stars in the Milky Way (best estimates say ~3T vs. 100–400B)."
 ];
-
 function showRandomFact(){
   const i = Math.floor(Math.random() * FACTS.length);
   factBox.textContent = `Did you know? ${FACTS[i]}`;
 }
 
-// ---- Utilities ----
-const fmt = (d) => new Date(d).toISOString().slice(0,10); // yyyy-mm-dd
+// ---- UTC-safe date helpers ----
+function parts(iso){ const [y,m,d] = iso.split('-').map(Number); return {y,m,d}; }
+function addDaysUTC(iso, n){
+  const { y, m, d } = parts(iso);
+  const t = new Date(Date.UTC(y, m-1, d));
+  t.setUTCDate(t.getUTCDate() + n);
+  const yyyy = t.getUTCFullYear();
+  const mm   = String(t.getUTCMonth()+1).padStart(2,'0');
+  const dd   = String(t.getUTCDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function cmp(a,b){ return a.localeCompare(b); } // dates are YYYY-MM-DD strings
 
-function addDays(iso, n){
-  const dt = new Date(iso);
-  dt.setDate(dt.getDate() + n);
-  return fmt(dt);
+// ---- Core: collect 9 items with graceful extension ----
+// Start with [startISO .. startISO+8]. If fewer than 9 items found, keep
+// extending the end date +1 day until we have 9 (cap extension to avoid loops).
+function collectNine(startISO){
+  const MAX_EXTENSION_DAYS = 45; // safety cap
+  let endISO = addDaysUTC(startISO, 8);
+
+  // Pre-sort all dates once (ascending)
+  const dates = [...BY_DATE.keys()].sort(cmp);
+
+  // Utility: return items within [a..b] inclusive
+  const itemsInRange = (a, b) => {
+    const out = [];
+    for (const d of dates){
+      if (cmp(d, a) >= 0 && cmp(d, b) <= 0){
+        out.push(BY_DATE.get(d));
+      }
+    }
+    return out;
+  };
+
+  // Try extending forward until we have 9
+  for (let ext = 0; ext <= MAX_EXTENSION_DAYS; ext++){
+    const endTry = addDaysUTC(endISO, ext);
+    const picked = itemsInRange(startISO, endTry);
+    if (picked.length >= 9) return picked.slice(0,9);
+  }
+  return null; // not enough items even after extension
 }
 
-// From an array of APOD-like entries, return exactly 9 consecutive days (start->start+8)
-// If a date isn’t in the dataset (rare), we skip it gracefully.
-function pickNineConsecutive(data, startISO){
-  const need = new Set(Array.from({length:9}, (_,i)=> addDays(startISO, i)));
-  const byDate = new Map(data.map(item => [item.date, item]));
-  const out = [];
-  for(const d of Array.from(need).sort()){ if(byDate.has(d)) out.push(byDate.get(d)); }
-  return out;
+// Fallback: latest 9 items in the whole dataset
+function latestNine(){
+  const sorted = [...BY_DATE.keys()].sort(cmp); // ascending
+  return sorted.slice(-9).map(d => BY_DATE.get(d));
 }
 
-// Build one card (handles image or video thumbnail)
+// Choose a sensible default start (latest - 8)
+function getDefaultStart(){
+  const sorted = [...BY_DATE.keys()].sort(cmp);
+  const latest = sorted[sorted.length - 1];
+  return addDaysUTC(latest, -8);
+}
+
+// ---- Cards / Modal ----
 function buildCard(item){
   const card = document.createElement('article');
   card.className = 'card';
-  card.tabIndex = 0; // a11y focus
+  card.tabIndex = 0;
 
   const wrap = document.createElement('div');
   wrap.className = 'thumb-wrap';
 
-  if(item.media_type === 'video'){
-    // Show thumbnail if available; else a simple placeholder
+  if (item.media_type === 'video'){
     const img = document.createElement('img');
     img.alt = item.title || 'APOD Video';
     img.className = 'thumb-video';
-    img.src = item.thumbnail_url || 'https://i.ytimg.com/vi_webp/1/1.webp'; // safe fallback
+    img.src = item.thumbnail_url || 'https://i.ytimg.com/vi_webp/1/1.webp';
     wrap.appendChild(img);
 
     const badge = document.createElement('span');
     badge.className = 'badge';
     badge.textContent = 'Video';
     wrap.appendChild(badge);
-  }else{
+  } else {
     const img = document.createElement('img');
     img.alt = item.title || 'APOD Image';
     img.src = item.url || item.hdurl;
@@ -94,79 +131,86 @@ function buildCard(item){
   meta.append(h, d);
   card.append(wrap, meta);
 
-  // Open modal on click/enter
   card.addEventListener('click', () => openModal(item));
-  card.addEventListener('keyup', (e) => { if(e.key === 'Enter') openModal(item); });
+  card.addEventListener('keyup', (e) => { if (e.key === 'Enter') openModal(item); });
 
   return card;
 }
 
-// Modal open/close
 function openModal(item){
-  // Clear old media
   modalMedia.innerHTML = '';
 
-  if(item.media_type === 'video' && item.url){
-    // Embed YouTube (or use link if not embeddable)
+  if (item.media_type === 'video' && item.url){
     const iframe = document.createElement('iframe');
     iframe.src = item.url.includes('embed') ? item.url : item.url.replace('watch?v=', 'embed/');
     iframe.allowFullscreen = true;
     modalMedia.appendChild(iframe);
-  }else{
+  } else {
     const img = document.createElement('img');
     img.alt = item.title || 'APOD';
     img.src = item.hdurl || item.url;
     modalMedia.appendChild(img);
   }
 
-  modalTitle.textContent = item.title || 'Untitled';
-  modalDate.textContent = item.date || '';
+  modalTitle.textContent   = item.title || 'Untitled';
+  modalDate.textContent    = item.date  || '';
   modalExplain.textContent = item.explanation || '';
   modal.showModal();
 }
+
 modalClose.addEventListener('click', () => modal.close());
 modal.addEventListener('click', (e) => {
-  // click outside the content closes dialog
   const rect = modal.querySelector('.modal-content').getBoundingClientRect();
-  const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-  if(!inside) modal.close();
+  const inside = e.clientX >= rect.left && e.clientX <= rect.right &&
+                 e.clientY >= rect.top  && e.clientY <= rect.bottom;
+  if (!inside) modal.close();
 });
 
-// ---- Fetch + Render flow ----
-async function fetchData(){
-  // Show loading
-  loadingEl.hidden = false;
+// ---- Render / Init ----
+function renderList(list){
   galleryEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  list.forEach(item => frag.appendChild(buildCard(item)));
+  galleryEl.appendChild(frag);
+}
 
+function renderFrom(startISO){
+  // Try the requested window with forward extension
+  let nine = collectNine(startISO);
+  if (nine){
+    renderList(nine);
+    return;
+  }
+  // Fallback to latest 9 so the UI never goes blank
+  const fallback = latestNine();
+  renderList(fallback);
+  // Set the input to the fallback's first date (so the user sees the window)
+  if (fallback.length) startDateEl.value = fallback[0].date;
+}
+
+async function init(){
+  showRandomFact();
+  loadingEl.hidden = false;
   try{
-    const res = await fetch(CDN_URL, {cache:'no-store'});
-    if(!res.ok) throw new Error('Network error fetching APOD feed');
-    const all = await res.json(); // array of items
+    const res = await fetch(CDN_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Network error fetching APOD feed');
+    DATA = await res.json();
+    BY_DATE = new Map(DATA.map(x => [x.date, x]));
 
-    // Determine start date
-    let startISO = startDateEl.value || fmt(new Date()); // default today if empty
-    // Pick 9 consecutive days present in dataset
-    const picked = pickNineConsecutive(all, startISO);
-
-    if(picked.length === 0){
-      galleryEl.innerHTML = `<p>No entries found for ${startISO} range.</p>`;
-      return;
-    }
-
-    // Render cards
-    const frag = document.createDocumentFragment();
-    picked.forEach(item => frag.appendChild(buildCard(item)));
-    galleryEl.appendChild(frag);
-
+    const def = getDefaultStart();
+    startDateEl.value = def;
+    renderFrom(def);
   }catch(err){
     console.error(err);
     galleryEl.innerHTML = `<p>Failed to load data. Please try again.</p>`;
   }finally{
-    // Hide loading after render/attempt
     loadingEl.hidden = true;
   }
 }
 
-// Init
-showRandomFact();
-fetchBtn.addEventListener('click', fetchData);
+fetchBtn.addEventListener('click', () => {
+  const fromISO = startDateEl.value || getDefaultStart();
+  renderFrom(fromISO);
+});
+
+init();
