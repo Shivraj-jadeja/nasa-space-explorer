@@ -1,56 +1,75 @@
-# Project: NASA Space Explorer App (JSON Edition)
+# 🚀 NASA Space Explorer
 
-NASA publishes an [**Astronomy Picture of the Day (APOD)**](https://apod.nasa.gov/apod/archivepixFull.html)—images and videos with short explanations about our universe.
-
-In this project, you’ll build a gallery that fetches APOD-style entries from a **provided JSON feed** (same field names as the real APOD API). Render a grid of items and a modal with details.
+A web application that explores NASA’s Astronomy Picture of the Day (APOD) data through an interactive gallery.  
+The project focuses on working with real-world API-style data, dynamic rendering, and user-friendly visualization.
 
 ---
 
-## Data Source (CDN)
+## ✨ Overview
 
-Use this URL in your `fetch` request:
+NASA Space Explorer allows users to browse space imagery and videos from NASA’s Astronomy Picture of the Day archive.
 
-```js
-https://cdn.jsdelivr.net/gh/GCA-Classroom/apod/data.json
-```
+Users can:
+- Select a starting date to explore space content over time
+- View images and videos in a responsive gallery layout
+- Open a detailed modal with high-resolution media and explanations
+- Interact with content regardless of media type (image or video)
 
-- The file returns an **array** of APOD-like objects.  
-- Keys mirror NASA’s APOD API: `date`, `title`, `explanation`, `media_type`, `url`, `hdurl` (images only), optional `thumbnail_url` (videos), and `service_version`.
+The focus of this project is **API-style data consumption**, **dynamic UI rendering**, and **robust edge-case handling**.
 
-### Example object (image)
+---
 
-```json
-{
-  "date": "2025-10-01",
-  "title": "NGC 6960: The Witch's Broom Nebula",
-  "explanation": "…",
-  "media_type": "image",
-  "url": "https://apod.nasa.gov/apod/image/2510/WitchBroom_Meyers_1080.jpg",
-  "hdurl": "https://apod.nasa.gov/apod/image/2510/WitchBroom_Meyers_6043.jpg",
-  "service_version": "v1",
-  "copyright": "Brian Meyers"
-}
-```
+## 🚀 Key Features
 
-### Example object (with video)
-Not all APOD entries are images. Some are YouTube videos. Detect video entries and handle them appropriately by either embedding the video, displaying the thumbnail image, or providing a clear, clickable link to the video. 
+- **Dynamic APOD Gallery**
+  - Fetches APOD-style entries from a JSON feed structured like NASA’s real APOD API
+  - Displays a consistent grid of content cards with titles and dates
 
-The goal is to ensure users can easily access or clearly view content regardless of its media type.
+- **Media-Type Handling**
+  - Supports both images and videos
+  - Automatically renders thumbnails, embeds videos, or displays high-resolution images as needed
 
-```json
-{
-  "date": "2024-06-30",
-  "title": "Earthrise: A Video Reconstruction",
-  "explanation": "…",
-  "media_type": "video",
-  "url": "https://www.youtube.com/embed/1R5QqhPq1Ik",
-  "thumbnail_url": "https://img.youtube.com/vi/1R5QqhPq1Ik/hqdefault.jpg",
-  "service_version": "v1"
-}
-```
+- **Date-Based Exploration**
+  - Users choose a start date to explore content over a rolling time window
+  - Gracefully extends the range if data is missing to ensure a complete gallery view
 
-### Your Task
-* **Fetch the JSON:** Request the CDN URL above and parse the returned array.
-* **Display the Gallery:** For each item, show the image (or video thumbnail/player), title, and date.
+- **Detailed Modal View**
+  - Click any item to open a modal with media, title, date, and explanation
+  - Responsive layout adapts for desktop and mobile screens
 
+- **User Experience Enhancements**
+  - Loading states for data fetching
+  - Keyboard-accessible interactions
+  - Random space facts to enhance engagement
 
+---
+
+## 🛠️ Technical Stack
+
+- **Frontend:** HTML, CSS, JavaScript (ES6)
+- **Data Source:** APOD-style JSON feed (mirrors NASA APOD API fields)
+- **UI Patterns:** Responsive grid, modal dialogs
+- **State Handling:** In-memory data mapping and date-based indexing
+
+---
+
+## 🧩 Architecture Notes
+
+- Data is fetched once and indexed by date for efficient access.
+- The gallery dynamically renders content based on user-selected dates.
+- Media rendering logic adapts automatically based on the `media_type` field.
+- Fallback logic ensures the UI never appears empty due to missing data.
+
+---
+
+## ⚠️ Disclaimer
+
+This project is a **demonstration application built for learning purposes**.  
+It is **not an official NASA product or service**.
+
+---
+
+## 👤 Author
+
+**Shivraj Jadeja**  
+Software Engineering Apprentice – Global Career Accelerator
