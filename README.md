@@ -5,6 +5,10 @@ The project focuses on working with real-world API-style data, dynamic rendering
 
 ---
 
+![NASA Space Explorer](img/nasa-space-explorer-home.png)
+
+---
+
 ## ✨ Overview
 
 NASA Space Explorer allows users to browse space imagery and videos from NASA’s Astronomy Picture of the Day archive.
